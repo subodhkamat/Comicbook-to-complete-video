@@ -10,6 +10,7 @@ from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.staticfiles import StaticFiles
 from ocr_service import extract_comic_text
 from narration_service import generate_narration
+import shutil
 class DownloadableComicRequest(BaseModel):
     url: HttpUrl
 
@@ -237,3 +238,50 @@ async def import_downloadable_comic_endpoint(
             status_code=500,
             detail=f"{type(exc).__name__}: {str(exc) or repr(exc)}",
         ) from exc
+
+
+JOBS_DIR = BASE_DIR / "data" / "jobs"
+
+
+@app.delete("/delete-job/{job_id}")
+async def delete_job_files(job_id: str):
+    """Delete all files belonging to a specific job."""
+
+    # Validate the job ID to prevent path traversal.
+    if not job_id or any(
+        char not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_"
+        for char in job_id
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid job ID",
+        )
+
+    job_dir = (JOBS_DIR / job_id).resolve()
+    jobs_root = JOBS_DIR.resolve()
+
+    if job_dir.parent != jobs_root:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid job directory",
+        )
+
+    if not job_dir.exists() or not job_dir.is_dir():
+        raise HTTPException(
+            status_code=404,
+            detail="Job files not found",
+        )
+
+    try:
+        shutil.rmtree(job_dir)
+    except OSError as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not delete job files: {exc}",
+        ) from exc
+
+    return {
+        "success": True,
+        "job_id": job_id,
+        "message": "All files for this job have been deleted.",
+    }
