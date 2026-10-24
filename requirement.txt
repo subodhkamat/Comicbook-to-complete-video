@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+python-multipart 
+pymupdf pillow
+httpx
+chromium
+playwright
+easyocr
+groq 
+python-dotenv
